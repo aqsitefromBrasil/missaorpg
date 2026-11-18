@@ -5,6 +5,8 @@ global.rpgEstado = global.rpgEstado || {
 
 const SENHA_ADM = 'kaeldecalcinha';
 
+const RANKS_OFICIAIS = ['✴️', '🈸', '🉑', '🔆', '⚜️', '🔱', '✨'];
+
 const PESO_RANKS = {
   '✴️': 1,
   '🈸': 2,
@@ -91,10 +93,10 @@ module.exports = function (req, res) {
       }
 
       unicos.sort(function (a, b) {
-        const matchA = a.match(/([✴️🈸🉑🔆⚜️🔱✨]+)/u);
-        const matchB = b.match(/([✴️🈸🉑🔆⚜️🔱✨]+)/u);
-        const pesoA = matchA && PESO_RANKS[matchA[1].slice(-2)] ? PESO_RANKS[matchA[1].slice(-2)] : 1;
-        const pesoB = matchB && PESO_RANKS[matchB[1].slice(-2)] ? PESO_RANKS[matchB[1].slice(-2)] : 1;
+        const rankA = RANKS_OFICIAIS.find(r => a.includes(r));
+        const rankB = RANKS_OFICIAIS.find(r => b.includes(r));
+        const pesoA = rankA ? PESO_RANKS[rankA] : 1;
+        const pesoB = rankB ? PESO_RANKS[rankB] : 1;
         return pesoB - pesoA;
       });
 
@@ -117,19 +119,15 @@ module.exports = function (req, res) {
       return res.status(200).json({ replies: [] });
     }
 
-    // --- FILTRO RIGOROSO DE RANKS ---
-    // Verifica se a mensagem possui obrigatoriamente um dos emojis de rank oficiais no texto
-    const regexRanksOficiais = /[✴️🈸🉑🔆⚜️🔱✨]/u;
-    
-    // Lista de emojis comuns que NÃO devem acionar o registro sozinhos
-    const temEmojiPermitido = regexRanksOficiais.test(message);
+    // --- FILTRO EXATO DE RANKS (SEM FALSO POSITIVO EM ❤️ OU 🙌) ---
+    const temRankOficial = RANKS_OFICIAIS.some(emoji => message.includes(emoji));
 
-    if (temEmojiPermitido) {
-      // Evita registrar se a mensagem for apenas um emoji solto do tipo ❤️, 🙌, etc. sem o rank junto
+    if (temRankOficial) {
       if (global.rpgEstado.participantes.indexOf(message) === -1) {
         global.rpgEstado.participantes.push(message);
+        // AutoResponder só aceita "message" no webhook (não suporta "reaction")
         return res.status(200).json({
-          replies: [{ reaction: "✅" }]
+          replies: [{ message: '✅' }]
         });
       }
     }
