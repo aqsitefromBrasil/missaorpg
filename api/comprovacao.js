@@ -14,25 +14,18 @@ const PESO_RANKS = {
 
 export default function handler(req, res) {
   try {
-    // Garante que aceita GET e POST sem crashar
     const query = req.query || {};
-    let body = {};
+    let message = query.msg || query.message || query.text || '';
     
+    // Decodifica caso venha formatado pela URL
     try {
-      if (typeof req.body === 'object' && req.body !== null) {
-        body = req.body;
-      } else if (typeof req.body === 'string' && req.body.trim() !== '') {
-        body = JSON.parse(req.body);
-      }
+      message = decodeURIComponent(message).trim();
     } catch (e) {
-      body = {};
+      message = String(message).trim();
     }
 
-    // Extrai a mensagem de qualquer lugar possível sem risco de erro
-    const message = (query.msg || query.message || body.message || body.text || body.q || '').trim();
-
     if (!message) {
-      return res.status(200).json({ status: 'ok', message: 'Bot ativo e pronto.' });
+      return res.status(200).json({ status: 'ok', message: 'Aguardando mensagem...' });
     }
 
     const partes = message.split(/\s+/);
@@ -122,7 +115,6 @@ export default function handler(req, res) {
     return res.status(200).json({ replies: [] });
 
   } catch (err) {
-    // Retorna sempre status 200 para impedir qualquer erro 500 no AutoResponder
     return res.status(200).json({ replies: [] });
   }
 }
