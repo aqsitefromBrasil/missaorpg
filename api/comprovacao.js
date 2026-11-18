@@ -19,8 +19,8 @@ export default async function handler(req, res) {
     }
 
     const body = req.body || {};
-    const query = body.query || {};
-    const message = (query.message || query.text || '').trim();
+    // O AutoResponder costuma mandar a mensagem em 'q' ou 'message'
+    const message = (body.q || body.message || (body.query && body.query.message) || '').trim();
 
     if (!message) {
       return res.status(200).json({ replies: [] });
@@ -98,7 +98,9 @@ export default async function handler(req, res) {
       return res.status(200).json({ replies: [] });
     }
 
+    // Pega a primeira linha da mensagem enviada pelo membro
     const primeiraLinha = message.split('\n')[0].trim();
+    // Verifica se tem texto seguido de emojis no final
     const temEmojisNoFim = /[✴️🈸🉑🔆⚜️🔱✨]+$/u.test(primeiraLinha);
 
     if (temEmojisNoFim) {
