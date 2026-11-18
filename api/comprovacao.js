@@ -12,12 +12,11 @@ const PESO_RANKS = {
   '✨': 6
 };
 
-export default function handler(req, res) {
+module.exports = async (req, res) => {
   try {
     const query = req.query || {};
     let message = query.msg || query.message || query.text || '';
     
-    // Decodifica caso venha formatado pela URL
     try {
       message = decodeURIComponent(message).trim();
     } catch (e) {
@@ -117,4 +116,4 @@ export default function handler(req, res) {
   } catch (err) {
     return res.status(200).json({ replies: [] });
   }
-}
+};
