@@ -12,7 +12,7 @@ const PESO_RANKS = {
   '✨': 6
 };
 
-module.exports = async (req, res) => {
+export default async function handler(req, res) {
   try {
     if (req.method !== 'POST') {
       return res.status(200).json({ status: 'ok', message: 'API ativa.' });
@@ -118,4 +118,4 @@ module.exports = async (req, res) => {
       replies: [{ message: '⚠️ Erro interno processado com segurança.' }]
     });
   }
-};
+}
