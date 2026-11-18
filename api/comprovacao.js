@@ -17,8 +17,12 @@ const PESO_RANKS = {
   '🔱': 6  // Rank S
 };
 
-// Regex para validar o modelo: "Nome + Espaço + Emoji do Rank"
-const PADRAO_NICK_RANK = /^([A-Za-zÀ-ÖØ-öø-ÿ0-9_'-]+(?:\s+[A-Za-zÀ-ÖØ-öø-ÿ0-9_'-]+)*)\s+([✴️🈸🉑🔆⚜️🔱])$/u;
+// Emojis de descendência válidos extraídos do lore oficial do RPG
+const EMOJIS_DESCENDENCIA = ['👁‍🗨', '❄️', '🐾', '🐉', '🔥', '🕷️', '🧬', '🌸', '⏳', '🐞', '⚙️', '🌐', '🦅', '📛', '🌑'];
+
+// Regex para validar o modelo completo: "[Emoji Descendência] + Nome + [Emoji Rank]"
+// Exemplo: 👁‍🗨 Ashborn 🔱
+const PADRAO_COMPLETO = /^([👁‍🗨❄️🐾🐉🔥🕷️🧬🌸⏳🐞⚙️🌐🦅📛🌑])\s+(.+?)\s+([✴️🈸🉑🔆⚜️🔱])$/u;
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -59,7 +63,7 @@ export default async function handler(req, res) {
       participantes.clear();
       return res.status(200).json({
         replies: [
-          { message: '🟢 *Missão Iniciada!* O bot agora está capturando as comprovações no modelo oficial.' }
+          { message: '🟢 *Missão Iniciada!* O bot está validando o padrão com Descendência e Rank.' }
         ]
       });
     }
@@ -72,20 +76,22 @@ export default async function handler(req, res) {
       }
 
       const listaArray = Array.from(participantes).map((item) => {
-        const match = item.match(PADRAO_NICK_RANK);
+        const match = item.match(PADRAO_COMPLETO);
+        const nickNome = match ? match[2].trim() : item;
+
         return {
           textoCompleto: item,
-          nick: match ? match[1].trim() : item,
-          emoji: match ? match[2] : '✴️',
-          peso: match && PESO_RANKS[match[2]] ? PESO_RANKS[match[2]] : 1
+          nickOrdenacao: nickNome,
+          peso: match && PESO_RANKS[match[3]] ? PESO_RANKS[match[3]] : 1
         };
       });
 
+      // Ordena por rank (maior para menor) e alfabeticamente pelo nick
       listaArray.sort((a, b) => {
         if (b.peso !== a.peso) {
           return b.peso - a.peso;
         }
-        return a.nick.localeCompare(b.nick, 'pt-BR', { sensitivity: 'base' });
+        return a.nickOrdenacao.localeCompare(b.nickOrdenacao, 'pt-BR', { sensitivity: 'base' });
       });
 
       const textoFinal = listaArray.map((item) => `• ${item.textoCompleto}`).join('\n');
@@ -128,10 +134,12 @@ export default async function handler(req, res) {
     }
 
     let nickValido = null;
-    if (PADRAO_NICK_RANK.test(sender)) {
+    const primeiraLinhaMsg = message.split('\n')[0].trim();
+
+    if (PADRAO_COMPLETO.test(primeiraLinhaMsg)) {
+      nickValido = primeiraLinhaMsg;
+    } else if (PADRAO_COMPLETO.test(sender)) {
       nickValido = sender;
-    } else if (PADRAO_NICK_RANK.test(message)) {
-      nickValido = message;
     }
 
     if (nickValido) {
