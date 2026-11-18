@@ -14,16 +14,14 @@ const PESO_RANKS = {
 
 export default async function handler(req, res) {
   try {
-    if (req.method !== 'POST') {
-      return res.status(200).json({ status: 'ok', message: 'API ativa.' });
-    }
-
+    // Pega a mensagem tanto do corpo do POST quanto dos parâmetros da URL (Query)
+    const query = req.query || {};
     const body = req.body || {};
-    // O AutoResponder costuma mandar a mensagem em 'q' ou 'message'
-    const message = (body.q || body.message || (body.query && body.query.message) || '').trim();
+    
+    const message = (query.msg || query.message || query.text || body.message || body.text || body.q || '').trim();
 
     if (!message) {
-      return res.status(200).json({ replies: [] });
+      return res.status(200).json({ status: 'ok', message: 'Aguardando mensagem...' });
     }
 
     const partes = message.split(/\s+/);
@@ -98,9 +96,8 @@ export default async function handler(req, res) {
       return res.status(200).json({ replies: [] });
     }
 
-    // Pega a primeira linha da mensagem enviada pelo membro
+    // Pega a primeira linha e verifica se termina com os emojis de rank
     const primeiraLinha = message.split('\n')[0].trim();
-    // Verifica se tem texto seguido de emojis no final
     const temEmojisNoFim = /[✴️🈸🉑🔆⚜️🔱✨]+$/u.test(primeiraLinha);
 
     if (temEmojisNoFim) {
