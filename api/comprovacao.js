@@ -31,37 +31,33 @@ const PADRAO_NICK_RANK = /^([A-Za-zÀ-ÖØ-öø-ÿ0-9_'-]+(?:\s+[A-Za-zÀ-ÖØ-�
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Método não permitido. Use POST.' });
+    return res.status(200).json({ error: 'Método não permitido. Use POST.' });
   }
 
   try {
-    const data = req.body;
-    const sender = data?.query?.sender?.trim() || '';
-    const message = data?.query?.message?.trim() || '';
+    const data = req.body || {};
+    const query = data.query || {};
+    
+    const sender = (query.sender || '').trim();
+    const message = (query.message || '').trim();
     const comando = message.toLowerCase();
 
-    const senderPhone = (data?.query?.senderPhone || data?.query?.author || '').replace(/\D/g, '');
+    const rawPhone = query.senderPhone || query.author || query.from || '';
+    const senderPhone = String(rawPhone).replace(/\D/g, '');
 
     const ehComando =
       comando === '/iniciarmissao' ||
       comando === '/fecharmissao' ||
       comando === '!lista' ||
       comando === '/limpar';
-if (ehComando) {
+
+    if (ehComando) {
       const ehAdm = ADMINS_AUTORIZADOS.has(senderPhone);
 
       if (!ehAdm) {
         return res.status(200).json({
           replies: [
-            { message: `⚠️ *${sender}*, seu número detectado foi: *${senderPhone}*. Você não é reconhecido como ADM.` }
-          ]
-        });
-      }
-    }
-      if (!ehAdm) {
-        return res.status(200).json({
-          replies: [
-            { message: `⚠️ *${sender}*, apenas membros da Equipe Gestora podem usar este comando.` }
+            { message: `⚠️ *${sender || 'Usuário'}*, apenas membros da Equipe Gestora podem usar este comando. (Seu número detectado: ${senderPhone || 'vazio'})` }
           ]
         });
       }
@@ -151,27 +147,29 @@ if (ehComando) {
     }
 
     if (nickValido) {
-      // Se ainda não estava na lista, adiciona e reage com ✅ na mensagem do jogador
       if (!participantes.has(nickValido)) {
         participantes.add(nickValido);
         
         return res.status(200).json({
           replies: [
             {
-              reaction: "✅" // O AutoResponder vai dar a reação de correto na mensagem enviada
+              reaction: "✅"
             }
           ]
         });
       } else {
-        // Se o mesmo jogador mandar de novo, podemos dar uma reação neutra ou só ignorar
-        // Aqui deixamos sem resposta para não spammar se ele mandar a print duplicada
         return res.status(200).json({ replies: [] });
       }
     }
 
     return res.status(200).json({ replies: [] });
+
   } catch (error) {
-    console.error('Erro no webhook:', error);
-    return res.status(500).json({ replies: [] });
+    console.error('Erro crítico no webhook:', error);
+    return res.status(200).json({
+      replies: [
+        { message: '⚠️ Ocorreu um erro interno ao processar o comando no bot.' }
+      ]
+    });
   }
 }
