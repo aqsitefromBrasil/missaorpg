@@ -1,4 +1,3 @@
-// Objeto global persistente na instância da Vercel
 global.rpgEstado = global.rpgEstado || {
   missaoAberta: false,
   participantes: []
@@ -17,20 +16,23 @@ const PESO_RANKS = {
 };
 
 module.exports = function (req, res) {
-  try {
-    res.setHeader('Content-Type', 'application/json');
+  // Força o cabeçalho correto para o AutoResponder não recusar o JSON
+  res.setHeader('Content-Type', 'application/json; charset=utf-8');
 
+  try {
     const query = req.query || {};
-    let message = query.msg || query.message || query.text || '';
+    let message = query.msg || query.message || query.text || query.q || '';
     
-    if (req.body) {
-      if (typeof req.body === 'object' && req.body.message) {
-        message = req.body.message;
+    if (!message && req.body) {
+      if (typeof req.body === 'object') {
+        message = req.body.message || req.body.text || req.body.q || '';
       } else if (typeof req.body === 'string') {
         try {
           const parsed = JSON.parse(req.body);
-          if (parsed.message) message = parsed.message;
-        } catch (e) {}
+          message = parsed.message || parsed.text || parsed.q || '';
+        } catch (e) {
+          message = req.body;
+        }
       }
     }
 
@@ -41,10 +43,11 @@ module.exports = function (req, res) {
     }
 
     if (!message) {
-      return res.status(200).json({ status: 'ok', message: 'Bot ativo e pronto.' });
+      return res.status(200).json({ status: 'ok', message: 'Aguardando mensagem...' });
     }
 
-    const partes = message.split(/\s+/);
+    const mensagemLimpa = message.replace(/\s+/g, ' ');
+    const partes = mensagemLimpa.split(' ');
     const comando = partes[0] ? partes[0].toLowerCase() : '';
     const senhaInformada = partes[1] || '';
 
@@ -57,9 +60,7 @@ module.exports = function (req, res) {
     if (ehComando) {
       if (senhaInformada !== SENHA_ADM) {
         return res.status(200).json({
-          replies: [
-            { message: '⚠️ Senha incorreta! Use: ' + comando + ' ' + SENHA_ADM }
-          ]
+          replies: [{ message: '⚠️ Senha incorreta ou faltando! Use: ' + comando + ' ' + SENHA_ADM }]
         });
       }
 
@@ -141,6 +142,7 @@ module.exports = function (req, res) {
     return res.status(200).json({ replies: [] });
 
   } catch (err) {
+    // Retorna sempre um JSON válido mesmo se houver erro interno
     return res.status(200).json({ replies: [] });
   }
 };
