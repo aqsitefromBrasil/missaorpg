@@ -12,11 +12,25 @@ const PESO_RANKS = {
   '✨': 6
 };
 
-module.exports = async (req, res) => {
+module.exports = function (req, res) {
   try {
+    // Configura os headers para aceitar JSON e evitar cache agressivo da Vercel
+    res.setHeader('Content-Type', 'application/json');
+
     const query = req.query || {};
     let message = query.msg || query.message || query.text || '';
     
+    if (req.body) {
+      if (typeof req.body === 'object' && req.body.message) {
+        message = req.body.message;
+      } else if (typeof req.body === 'string') {
+        try {
+          const parsed = JSON.parse(req.body);
+          if (parsed.message) message = parsed.message;
+        } catch (e) {}
+      }
+    }
+
     try {
       message = decodeURIComponent(message).trim();
     } catch (e) {
@@ -41,7 +55,7 @@ module.exports = async (req, res) => {
       if (senhaInformada !== SENHA_ADM) {
         return res.status(200).json({
           replies: [
-            { message: `⚠️ Senha incorreta para o comando ${comando}. Use: ${comando} ${SENHA_ADM}` }
+            { message: '⚠️ Senha incorreta para o comando ' + comando + '. Use: ' + comando + ' ' + SENHA_ADM }
           ]
         });
       }
@@ -69,9 +83,14 @@ module.exports = async (req, res) => {
           });
         }
 
-        const unicos = [...new Set(participantes)];
+        const unicos = [];
+        for (let i = 0; i < participantes.length; i++) {
+          if (unicos.indexOf(participantes[i]) === -1) {
+            unicos.push(participantes[i]);
+          }
+        }
 
-        unicos.sort((a, b) => {
+        unicos.sort(function (a, b) {
           const matchA = a.match(/([✴️🈸🉑🔆⚜️🔱✨]+)$/u);
           const matchB = b.match(/([✴️🈸🉑🔆⚜️🔱✨]+)$/u);
           const pesoA = matchA && PESO_RANKS[matchA[1].slice(-2)] ? PESO_RANKS[matchA[1].slice(-2)] : 1;
@@ -79,8 +98,13 @@ module.exports = async (req, res) => {
           return pesoB - pesoA;
         });
 
-        const textoFinal = unicos.map((item) => `• ${item}`).join('\n');
-        const resposta = `📋 *CAÇADORES NA MISSÃO (${unicos.length}):*\n\n${textoFinal}`;
+        let textoFinal = '';
+        for (let j = 0; j < unicos.length; j++) {
+          textoFinal += '• ' + unicos[j] + '\n';
+        }
+        textoFinal = textoFinal.trim();
+
+        const resposta = '📋 *CAÇADORES NA MISSÃO (' + unicos.length + '):*\n\n' + textoFinal;
 
         if (comando === '/fecharmissao') {
           missaoAberta = false;
@@ -103,7 +127,7 @@ module.exports = async (req, res) => {
     const temEmojisNoFim = /[✴️🈸🉑🔆⚜️🔱✨]+$/u.test(primeiraLinha);
 
     if (temEmojisNoFim) {
-      if (!participantes.includes(primeiraLinha)) {
+      if (participantes.indexOf(primeiraLinha) === -1) {
         participantes.push(primeiraLinha);
         return res.status(200).json({
           replies: [{ reaction: "✅" }]
