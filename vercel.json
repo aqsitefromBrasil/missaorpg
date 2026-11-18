@@ -1,6 +1,3 @@
 {
-  "version": 2,
-  "routes": [
-    { "src": "/api/comprovacao", "dest": "/api/comprovacao.js" }
-  ]
+  "version": 2
 }
