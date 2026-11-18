@@ -19,16 +19,20 @@ module.exports = function (req, res) {
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
 
   try {
-    const query = req.query || {};
-    let message = query.msg || query.message || query.text || query.q || '';
+    // Captura de forma ampla em qualquer lugar que o AutoResponder envie
+    let message = '';
+    
+    if (req.query) {
+      message = req.query.msg || req.query.message || req.query.text || req.query.q || '';
+    }
     
     if (!message && req.body) {
       if (typeof req.body === 'object') {
-        message = req.body.message || req.body.text || req.body.q || '';
+        message = req.body.message || req.body.text || req.body.q || req.body.msg || '';
       } else if (typeof req.body === 'string') {
         try {
           const parsed = JSON.parse(req.body);
-          message = parsed.message || parsed.text || parsed.q || '';
+          message = parsed.message || parsed.text || parsed.q || parsed.msg || '';
         } catch (e) {
           message = req.body;
         }
@@ -41,8 +45,11 @@ module.exports = function (req, res) {
       message = String(message).trim();
     }
 
+    // SE AINDA ESTIVER VAZIO, vamos retornar o que o servidor enxergou para debug
     if (!message) {
-      return res.status(200).json({ status: 'ok', message: 'Aguardando mensagem...' });
+      return res.status(200).json({
+        replies: [{ message: '⚠️ Debug: Servidor ligado, mas nenhuma mensagem foi detectada nos parâmetros.' }]
+      });
     }
 
     const msgLower = message.toLowerCase().replace(/\s+/g, ' ').trim();
@@ -106,7 +113,7 @@ module.exports = function (req, res) {
       let textoFinal = '';
       for (let j = 0; j < unicos.length; j++) {
         const linhaLimpa = String(unicos[j]).replace(/[\r\n]+/g, ' ').trim();
-        textoFinal += '• ' + linhaLimpa + '\n';
+        textoFinal += '• ' + linhaLimpar + '\n';
       }
       textoFinal = textoFinal.trim();
 
