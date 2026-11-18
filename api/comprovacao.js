@@ -1,5 +1,9 @@
-let missaoAberta = false;
-let participantes = [];
+// Objeto global persistente na instância da Vercel
+global.rpgEstado = global.rpgEstado || {
+  missaoAberta: false,
+  participantes: []
+};
+
 const SENHA_ADM = 'kaeldecalcinha';
 
 const PESO_RANKS = {
@@ -14,7 +18,6 @@ const PESO_RANKS = {
 
 module.exports = function (req, res) {
   try {
-    // Configura os headers para aceitar JSON e evitar cache agressivo da Vercel
     res.setHeader('Content-Type', 'application/json');
 
     const query = req.query || {};
@@ -38,7 +41,7 @@ module.exports = function (req, res) {
     }
 
     if (!message) {
-      return res.status(200).json({ status: 'ok', message: 'Aguardando mensagem...' });
+      return res.status(200).json({ status: 'ok', message: 'Bot ativo e pronto.' });
     }
 
     const partes = message.split(/\s+/);
@@ -55,38 +58,38 @@ module.exports = function (req, res) {
       if (senhaInformada !== SENHA_ADM) {
         return res.status(200).json({
           replies: [
-            { message: '⚠️ Senha incorreta para o comando ' + comando + '. Use: ' + comando + ' ' + SENHA_ADM }
+            { message: '⚠️ Senha incorreta! Use: ' + comando + ' ' + SENHA_ADM }
           ]
         });
       }
 
       if (comando === '/iniciarmissao') {
-        missaoAberta = true;
-        participantes = [];
+        global.rpgEstado.missaoAberta = true;
+        global.rpgEstado.participantes = [];
         return res.status(200).json({
           replies: [{ message: '🟢 *Missão Iniciada!* O bot está capturando as comprovações.' }]
         });
       }
 
       if (comando === '/limpar') {
-        missaoAberta = false;
-        participantes = [];
+        global.rpgEstado.missaoAberta = false;
+        global.rpgEstado.participantes = [];
         return res.status(200).json({
           replies: [{ message: '🧹 Lista zerada e missão fechada!' }]
         });
       }
 
       if (comando === '/fecharmissao' || comando === '!lista') {
-        if (participantes.length === 0) {
+        if (global.rpgEstado.participantes.length === 0) {
           return res.status(200).json({
             replies: [{ message: '📭 Nenhum caçador registrado nesta missão.' }]
           });
         }
 
         const unicos = [];
-        for (let i = 0; i < participantes.length; i++) {
-          if (unicos.indexOf(participantes[i]) === -1) {
-            unicos.push(participantes[i]);
+        for (let i = 0; i < global.rpgEstado.participantes.length; i++) {
+          if (unicos.indexOf(global.rpgEstado.participantes[i]) === -1) {
+            unicos.push(global.rpgEstado.participantes[i]);
           }
         }
 
@@ -107,7 +110,7 @@ module.exports = function (req, res) {
         const resposta = '📋 *CAÇADORES NA MISSÃO (' + unicos.length + '):*\n\n' + textoFinal;
 
         if (comando === '/fecharmissao') {
-          missaoAberta = false;
+          global.rpgEstado.missaoAberta = false;
           return res.status(200).json({
             replies: [{ message: '🔴 *Missão Encerrada!* Lista final:\n\n' + resposta }]
           });
@@ -119,7 +122,7 @@ module.exports = function (req, res) {
       }
     }
 
-    if (!missaoAberta) {
+    if (!global.rpgEstado.missaoAberta) {
       return res.status(200).json({ replies: [] });
     }
 
@@ -127,8 +130,8 @@ module.exports = function (req, res) {
     const temEmojisNoFim = /[✴️🈸🉑🔆⚜️🔱✨]+$/u.test(primeiraLinha);
 
     if (temEmojisNoFim) {
-      if (participantes.indexOf(primeiraLinha) === -1) {
-        participantes.push(primeiraLinha);
+      if (global.rpgEstado.participantes.indexOf(primeiraLinha) === -1) {
+        global.rpgEstado.participantes.push(primeiraLinha);
         return res.status(200).json({
           replies: [{ reaction: "✅" }]
         });
