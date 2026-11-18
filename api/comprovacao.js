@@ -47,10 +47,17 @@ export default async function handler(req, res) {
       comando === '/fecharmissao' ||
       comando === '!lista' ||
       comando === '/limpar';
-
-    if (ehComando) {
+if (ehComando) {
       const ehAdm = ADMINS_AUTORIZADOS.has(senderPhone);
 
+      if (!ehAdm) {
+        return res.status(200).json({
+          replies: [
+            { message: `⚠️ *${sender}*, seu número detectado foi: *${senderPhone}*. Você não é reconhecido como ADM.` }
+          ]
+        });
+      }
+    }
       if (!ehAdm) {
         return res.status(200).json({
           replies: [
