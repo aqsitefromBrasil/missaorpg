@@ -1,27 +1,18 @@
-// Controla se a missão está aceitando capturas no momento
 let missaoAberta = false;
-
-// Armazena os nicks únicos capturados
 let participantes = new Set();
-
-// Senha secreta exigida para comandos de ADM
 const SENHA_ADM = 'kaeldecalcinha';
 
-// Tabela de pesos dos emojis de rank para ordenar do menor para o maior
 const PESO_RANKS = {
-  '✴️': 1, // Rank E
-  '🈸': 2, // Rank D
-  '🉑': 3, // Rank C
-  '🔆': 4, // Rank B
-  '⚜️': 5, // Rank A
-  '🔱': 6  // Rank S
+  '✴️': 1,
+  '🈸': 2,
+  '🉑': 3,
+  '🔆': 4,
+  '⚜️': 5,
+  '🔱': 6,
+  '✨': 6 // Incluído caso usem ✨ como rank ou descendência extra
 };
 
-// Regex atualizada para o modelo: [Nick][Emoji Descendência][Emoji Rank]
-// Exemplo: nidhogg👁‍🗨🔱 (ou com espaços opcionais)
-const PADRAO_MODELO = /^(.+?)([\p{So}\p{Symbol}]+)([✴️🈸🉑🔆⚜️🔱])$/u;
-
-export default async function handler(req, res) {
+module.exports = async (req, res) => {
   if (req.method !== 'POST') {
     return res.status(200).json({ error: 'Método não permitido. Use POST.' });
   }
@@ -45,20 +36,17 @@ export default async function handler(req, res) {
       if (senhaInformada !== SENHA_ADM) {
         return res.status(200).json({
           replies: [
-            { message: `⚠️ Comando negado. Use a senha correta (Ex: \`${comando} ${SENHA_ADM}\`).` }
+            { message: `⚠️ Senha incorreta. Use: ${comando} ${SENHA_ADM}` }
           ]
         });
       }
     }
 
-    // ==========================================
-    // 1. COMANDOS DE CONTROLE DA MISSÃO
-    // ==========================================
     if (comando === '/iniciarmissao') {
       missaoAberta = true;
       participantes.clear();
       return res.status(200).json({
-        replies: [{ message: '🟢 *Missão Iniciada!* O bot está capturando no modelo `nidhogg👁‍🗨🔱`.' }]
+        replies: [{ message: '🟢 *Missão Iniciada!* O bot está pronto para capturar as comprovações.' }]
       });
     }
 
@@ -70,21 +58,20 @@ export default async function handler(req, res) {
       }
 
       const listaArray = Array.from(participantes).map((item) => {
-        const match = item.match(PADRAO_MODELO);
-        const nickNome = match ? match[1].trim() : item;
-        const rankEmoji = match ? match[3] : '✴️';
-        
+        // Tenta achar o último emoji da linha para usar como peso de ordenação
+        const matchRank = item.match(/([✴️🈸🉑🔆⚜️🔱✨]+)$/u);
+        const rankEmoji = matchRank ? matchRank[1].slice(-2) : '✴️';
+
         return {
           textoCompleto: item,
           peso: PESO_RANKS[rankEmoji] || 1,
-          nomeLimpo: nickNome.replace(/^[^\p{L}\p{N}]+/u, '').trim()
+          nickLimpo: item.replace(/^[^\p{L}\p{N}]+/u, '').trim()
         };
       });
 
-      // Ordena por Rank (S até E) e alfabeticamente pelo nick
       listaArray.sort((a, b) => {
         if (b.peso !== a.peso) return b.peso - a.peso;
-        return a.nomeLimpo.localeCompare(b.nomeLimpo, 'pt-BR', { sensitivity: 'base' });
+        return a.nickLimpo.localeCompare(b.nickLimpo, 'pt-BR', { sensitivity: 'base' });
       });
 
       const textoFinal = listaArray.map((item) => `• ${item.textoCompleto}`).join('\n');
@@ -108,19 +95,19 @@ export default async function handler(req, res) {
       });
     }
 
-    // ==========================================
-    // 2. CAPTURA AUTOMÁTICA E REAÇÃO (Com missão aberta)
-    // ==========================================
     if (!missaoAberta) {
       return res.status(200).json({ replies: [] });
     }
 
+    // Valida mensagens que começam com texto/emoji e terminam com emojis (o padrão do print)
     const primeiraLinha = message.split('\n')[0].trim();
-    let nickValido = null;
+    // Regex flexível: aceita qualquer texto que tenha emojis no início e/ou fim
+    const regexValida = /^(.+?)[✴️🈸🉑🔆⚜️🔱✨]+$/u;
 
-    if (PADRAO_MODELO.test(primeiraLinha)) {
+    let nickValido = null;
+    if (regexValida.test(primeiraLinha)) {
       nickValido = primeiraLinha;
-    } else if (PADRAO_MODELO.test(message)) {
+    } else if (regexValida.test(message)) {
       nickValido = message;
     }
 
@@ -139,4 +126,4 @@ export default async function handler(req, res) {
     console.error('Erro:', error);
     return res.status(200).json({ replies: [] });
   }
-}
+};
