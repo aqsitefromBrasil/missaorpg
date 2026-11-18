@@ -19,7 +19,6 @@ module.exports = function (req, res) {
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
 
   try {
-    // Captura de forma ampla em qualquer lugar que o AutoResponder envie
     let message = '';
     
     if (req.query) {
@@ -45,11 +44,8 @@ module.exports = function (req, res) {
       message = String(message).trim();
     }
 
-    // SE AINDA ESTIVER VAZIO, vamos retornar o que o servidor enxergou para debug
     if (!message) {
-      return res.status(200).json({
-        replies: [{ message: '⚠️ Debug: Servidor ligado, mas nenhuma mensagem foi detectada nos parâmetros.' }]
-      });
+      return res.status(200).json({ status: 'ok', message: 'Aguardando mensagem...' });
     }
 
     const msgLower = message.toLowerCase().replace(/\s+/g, ' ').trim();
@@ -103,8 +99,8 @@ module.exports = function (req, res) {
       }
 
       unicos.sort(function (a, b) {
-        const matchA = a.match(/([✴️🈸🉑🔆⚜️🔱✨]+)$/u);
-        const matchB = b.match(/([✴️🈸🉑🔆⚜️🔱✨]+)$/u);
+        const matchA = a.match(/([✴️🈸🉑🔆⚜️🔱✨]+)/u);
+        const matchB = b.match(/([✴️🈸🉑🔆⚜️🔱✨]+)/u);
         const pesoA = matchA && PESO_RANKS[matchA[1].slice(-2)] ? PESO_RANKS[matchA[1].slice(-2)] : 1;
         const pesoB = matchB && PESO_RANKS[matchB[1].slice(-2)] ? PESO_RANKS[matchB[1].slice(-2)] : 1;
         return pesoB - pesoA;
@@ -113,7 +109,7 @@ module.exports = function (req, res) {
       let textoFinal = '';
       for (let j = 0; j < unicos.length; j++) {
         const linhaLimpa = String(unicos[j]).replace(/[\r\n]+/g, ' ').trim();
-        textoFinal += '• ' + linhaLimpar + '\n';
+        textoFinal += '• ' + linhaLimpa + '\n';
       }
       textoFinal = textoFinal.trim();
 
@@ -135,12 +131,17 @@ module.exports = function (req, res) {
       return res.status(200).json({ replies: [] });
     }
 
-    const primeiraLinha = message.split('\n')[0].trim();
-    const temEmojisNoFim = /[✴️🈸🉑🔆⚜️🔱✨]+$/u.test(primeiraLinha);
+    // --- CAPTURA FLEXÍVEL DE PARTICIPANTES ---
+    // Pega a mensagem inteira limpa de espaços excessivos nas pontas
+    const mensagemCompleta = message.trim();
+    
+    // Verifica se a mensagem contém QUALQUER um dos emojis de rank em qualquer parte dela (ou no fim)
+    const contemEmojiRank = /[✴️🈸🉑🔆⚜️🔱✨]/u.test(mensagemCompleta);
 
-    if (temEmojisNoFim) {
-      if (global.rpgEstado.participantes.indexOf(primeiraLinha) === -1) {
-        global.rpgEstado.participantes.push(primeiraLinha);
+    if (contemEmojiRank) {
+      // Evita duplicatas exatas na lista
+      if (global.rpgEstado.participantes.indexOf(mensagemCompleta) === -1) {
+        global.rpgEstado.participantes.push(mensagemCompleta);
         return res.status(200).json({
           replies: [{ reaction: "✅" }]
         });
