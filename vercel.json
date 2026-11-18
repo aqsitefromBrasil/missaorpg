@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "builds": [
-    { "src": "api/comprovacao.js", "use": "@vercel/node" }
+  "routes": [
+    { "src": "/api/comprovacao", "dest": "/api/comprovacao.js" }
   ]
 }
