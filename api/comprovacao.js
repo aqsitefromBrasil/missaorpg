@@ -4,17 +4,8 @@ let missaoAberta = false;
 // Armazena os nicks únicos capturados
 let participantes = new Set();
 
-// ==========================================
-// LISTA DE ADMINISTRADORES AUTORIZADOS
-// ==========================================
-const ADMINS_AUTORIZADOS = new Set([
-  '558591197017',
-  '5585991197017',
-  '5521971835736',
-  '552171835736',
-  '5599991913839',
-  '559991913839'
-]);
+// Senha secreta exigida para comandos de ADM
+const SENHA_ADM = 'kaeldecalcinha';
 
 // Tabela de pesos dos emojis para ordenar do menor para o maior rank
 const PESO_RANKS = {
@@ -40,10 +31,9 @@ export default async function handler(req, res) {
     
     const sender = (query.sender || '').trim();
     const message = (query.message || '').trim();
-    const comando = message.toLowerCase();
-
-    const rawPhone = query.senderPhone || query.author || query.from || '';
-    const senderPhone = String(rawPhone).replace(/\D/g, '');
+    const partes = message.split(/\s+/);
+    const comando = partes[0].toLowerCase();
+    const senhaInformada = partes[1] || '';
 
     const ehComando =
       comando === '/iniciarmissao' ||
@@ -52,19 +42,17 @@ export default async function handler(req, res) {
       comando === '/limpar';
 
     if (ehComando) {
-      const ehAdm = ADMINS_AUTORIZADOS.has(senderPhone);
-
-      if (!ehAdm) {
+      if (senhaInformada !== SENHA_ADM) {
         return res.status(200).json({
           replies: [
-            { message: `⚠️ *${sender || 'Usuário'}*, apenas membros da Equipe Gestora podem usar este comando. (Seu número detectado: ${senderPhone || 'vazio'})` }
+            { message: `⚠️ *${sender || 'Usuário'}*, comando negado. Você precisa informar a senha secreta correta (Ex: \`${comando} ${SENHA_ADM}\`).` }
           ]
         });
       }
     }
 
     // ==========================================
-    // 1. COMANDOS DE CONTROLE DA MISSÃO (Apenas ADMs)
+    // 1. COMANDOS DE CONTROLE DA MISSÃO (Com Senha)
     // ==========================================
     if (comando === '/iniciarmissao') {
       missaoAberta = true;
