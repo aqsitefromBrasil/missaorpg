@@ -5,6 +5,7 @@ global.rpgEstado = global.rpgEstado || {
 
 const SENHA_ADM = 'kaeldecalcinha';
 
+// Ranks oficiais aceitos pelo sistema
 const PESO_RANKS = {
   '✴️': 1,
   '🈸': 2,
@@ -21,7 +22,6 @@ module.exports = function (req, res) {
   try {
     let message = '';
 
-    // 1. Leitura do formato padrão POST do AutoResponder.ai (ex: { query: { message: "..." } })
     if (req.body) {
       let bodyObj = req.body;
       if (typeof bodyObj === 'string') {
@@ -42,62 +42,46 @@ module.exports = function (req, res) {
       }
     }
 
-    // 2. Fallback caso algum dado venha via GET na URL
     if (!message && req.query) {
       message = req.query.msg || req.query.message || req.query.text || req.query.q || '';
     }
 
     message = String(message).trim();
 
-    // Ignora se vier vazio ou se vier a tag literal não substituída
     if (!message || message === '[message]') {
       return res.status(200).json({ replies: [] });
     }
 
     const msgLower = message.toLowerCase().replace(/\s+/g, ' ').trim();
 
-    // --- COMANDO: INICIAR MISSÃO ---
+    // --- COMANDOS DE ADMIN ---
     if (msgLower.indexOf('/iniciarmissao') === 0) {
       if (msgLower.indexOf(SENHA_ADM) === -1) {
-        return res.status(200).json({
-          replies: [{ message: '⚠️ Senha incorreta! Use: /iniciarmissao ' + SENHA_ADM }]
-        });
+        return res.status(200).json({ replies: [{ message: '⚠️ Senha incorreta!' }] });
       }
       global.rpgEstado.missaoAberta = true;
       global.rpgEstado.participantes = [];
-      return res.status(200).json({
-        replies: [{ message: '🟢 *Missão Iniciada!* O bot está capturando as comprovações.' }]
-      });
+      return res.status(200).json({ replies: [{ message: '🟢 *Missão Iniciada!* O bot agora só captura mensagens com os ranks oficiais.' }] });
     }
 
-    // --- COMANDO: LIMPAR LISTA ---
     if (msgLower.indexOf('/limpar') === 0) {
       if (msgLower.indexOf(SENHA_ADM) === -1) {
-        return res.status(200).json({
-          replies: [{ message: '⚠️ Senha incorreta! Use: /limpar ' + SENHA_ADM }]
-        });
+        return res.status(200).json({ replies: [{ message: '⚠️ Senha incorreta!' }] });
       }
       global.rpgEstado.missaoAberta = false;
       global.rpgEstado.participantes = [];
-      return res.status(200).json({
-        replies: [{ message: '🧹 Lista zerada e missão fechada!' }]
-      });
+      return res.status(200).json({ replies: [{ message: '🧹 Lista zerada!' }] });
     }
 
-    // --- COMANDO: FECHAR MISSÃO OU VER LISTA ---
     if (msgLower.indexOf('/fecharmissao') === 0 || msgLower.indexOf('!lista') === 0) {
       const ehFechamento = msgLower.indexOf('/fecharmissao') === 0;
-
+      
       if (ehFechamento && msgLower.indexOf(SENHA_ADM) === -1) {
-        return res.status(200).json({
-          replies: [{ message: '⚠️ Senha incorreta! Use: /fecharmissao ' + SENHA_ADM }]
-        });
+        return res.status(200).json({ replies: [{ message: '⚠️ Senha incorreta!' }] });
       }
 
       if (!global.rpgEstado.participantes || global.rpgEstado.participantes.length === 0) {
-        return res.status(200).json({
-          replies: [{ message: '📭 Nenhum caçador registrado nesta missão.' }]
-        });
+        return res.status(200).json({ replies: [{ message: '📭 Nenhum caçador registrado nesta missão.' }] });
       }
 
       const unicos = [];
@@ -117,33 +101,30 @@ module.exports = function (req, res) {
 
       let textoFinal = '';
       for (let j = 0; j < unicos.length; j++) {
-        const linhaLimpa = String(unicos[j]).replace(/[\r\n]+/g, ' ').trim();
-        textoFinal += '• ' + linhaLimpa + '\n';
+        textoFinal += '• ' + unicos[j] + '\n';
       }
 
       const resposta = '📋 *CAÇADORES NA MISSÃO (' + unicos.length + '):*\n\n' + textoFinal.trim();
 
       if (ehFechamento) {
         global.rpgEstado.missaoAberta = false;
-        return res.status(200).json({
-          replies: [{ message: '🔴 *Missão Encerrada!* Lista final:\n\n' + resposta }]
-        });
+        return res.status(200).json({ replies: [{ message: '🔴 *Missão Encerrada!* Lista final:\n\n' + resposta }] });
       }
 
-      return res.status(200).json({
-        replies: [{ message: resposta }]
-      });
+      return res.status(200).json({ replies: [{ message: resposta }] });
     }
 
-    // Se a missão estiver fechada, ignora mensagens comuns
     if (!global.rpgEstado.missaoAberta) {
       return res.status(200).json({ replies: [] });
     }
 
-    // --- CAPTURA DE COMPROVAÇÕES ---
-    const contemEmojiRank = /[✴️🈸🉑🔆⚜️🔱✨]/u.test(message);
+    // --- TRAVA DE SEGURANÇA: APENAS RANKS OFICIAIS ---
+    // Cria uma regex combinando exatamente os emojis permitidos
+    const regexRanksOficiais = /[✴️🈸🉑🔆⚜️🔱✨]/u;
+    const temRankOficial = regexRanksOficiais.test(message);
 
-    if (contemEmojiRank) {
+    // Se a mensagem contiver um dos emojis oficiais e ainda não estiver registrada, salva
+    if (temRankOficial) {
       if (global.rpgEstado.participantes.indexOf(message) === -1) {
         global.rpgEstado.participantes.push(message);
         return res.status(200).json({
@@ -152,6 +133,7 @@ module.exports = function (req, res) {
       }
     }
 
+    // Se mandar figurinha, áudio ou conversa normal sem o emoji de rank, o bot ignora em silêncio
     return res.status(200).json({ replies: [] });
 
   } catch (err) {
