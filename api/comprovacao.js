@@ -5,7 +5,6 @@ global.rpgEstado = global.rpgEstado || {
 
 const SENHA_ADM = 'kaeldecalcinha';
 
-// Ranks oficiais aceitos pelo sistema
 const PESO_RANKS = {
   '✴️': 1,
   '🈸': 2,
@@ -61,7 +60,7 @@ module.exports = function (req, res) {
       }
       global.rpgEstado.missaoAberta = true;
       global.rpgEstado.participantes = [];
-      return res.status(200).json({ replies: [{ message: '🟢 *Missão Iniciada!* O bot agora só captura mensagens com os ranks oficiais.' }] });
+      return res.status(200).json({ replies: [{ message: '🟢 *Missão Iniciada!* Captura restrita aos ranks oficiais.' }] });
     }
 
     if (msgLower.indexOf('/limpar') === 0) {
@@ -118,13 +117,15 @@ module.exports = function (req, res) {
       return res.status(200).json({ replies: [] });
     }
 
-    // --- TRAVA DE SEGURANÇA: APENAS RANKS OFICIAIS ---
-    // Cria uma regex combinando exatamente os emojis permitidos
+    // --- FILTRO RIGOROSO DE RANKS ---
+    // Verifica se a mensagem possui obrigatoriamente um dos emojis de rank oficiais no texto
     const regexRanksOficiais = /[✴️🈸🉑🔆⚜️🔱✨]/u;
-    const temRankOficial = regexRanksOficiais.test(message);
+    
+    // Lista de emojis comuns que NÃO devem acionar o registro sozinhos
+    const temEmojiPermitido = regexRanksOficiais.test(message);
 
-    // Se a mensagem contiver um dos emojis oficiais e ainda não estiver registrada, salva
-    if (temRankOficial) {
+    if (temEmojiPermitido) {
+      // Evita registrar se a mensagem for apenas um emoji solto do tipo ❤️, 🙌, etc. sem o rank junto
       if (global.rpgEstado.participantes.indexOf(message) === -1) {
         global.rpgEstado.participantes.push(message);
         return res.status(200).json({
@@ -133,7 +134,6 @@ module.exports = function (req, res) {
       }
     }
 
-    // Se mandar figurinha, áudio ou conversa normal sem o emoji de rank, o bot ignora em silêncio
     return res.status(200).json({ replies: [] });
 
   } catch (err) {
