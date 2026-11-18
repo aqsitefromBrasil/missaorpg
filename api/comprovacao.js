@@ -1,5 +1,6 @@
+// Controle de estado global da missão
 let missaoAberta = false;
-let participantes = new Set();
+let participantes = [];
 const SENHA_ADM = 'kaeldecalcinha';
 
 const PESO_RANKS = {
@@ -9,19 +10,24 @@ const PESO_RANKS = {
   '🔆': 4,
   '⚜️': 5,
   '🔱': 6,
-  '✨': 6 // Incluído caso usem ✨ como rank ou descendência extra
+  '✨': 6
 };
 
 module.exports = async (req, res) => {
-  if (req.method !== 'POST') {
-    return res.status(200).json({ error: 'Método não permitido. Use POST.' });
-  }
-
+  // Garante resposta em JSON mesmo se houver erro bruto
   try {
-    const data = req.body || {};
-    const query = data.query || {};
-    
-    const message = (query.message || query.text || JSON.stringify(data)).trim();
+    if (req.method !== 'POST') {
+      return res.status(200).json({ status: 'ok', message: 'API ativa.' });
+    }
+
+    const body = req.body || {};
+    const query = body.query || {};
+    const message = (query.message || query.text || '').trim();
+
+    if (!message) {
+      return res.status(200).json({ replies: [] });
+    }
+
     const partes = message.split(/\s+/);
     const comando = partes[0] ? partes[0].toLowerCase() : '';
     const senhaInformada = partes[1] || '';
@@ -32,88 +38,79 @@ module.exports = async (req, res) => {
       comando === '!lista' ||
       comando === '/limpar';
 
+    // Validação de senha para comandos de ADM
     if (ehComando) {
       if (senhaInformada !== SENHA_ADM) {
         return res.status(200).json({
           replies: [
-            { message: `⚠️ Senha incorreta. Use: ${comando} ${SENHA_ADM}` }
+            { message: `⚠️ Senha incorreta para o comando ${comando}. Use: ${comando} ${SENHA_ADM}` }
           ]
         });
       }
-    }
 
-    if (comando === '/iniciarmissao') {
-      missaoAberta = true;
-      participantes.clear();
-      return res.status(200).json({
-        replies: [{ message: '🟢 *Missão Iniciada!* O bot está pronto para capturar as comprovações.' }]
-      });
-    }
-
-    if (comando === '/fecharmissao' || comando === '!lista') {
-      if (participantes.size === 0) {
+      if (comando === '/iniciarmissao') {
+        missaoAberta = true;
+        participantes = [];
         return res.status(200).json({
-          replies: [{ message: '📭 Nenhum caçador registrado nesta missão.' }]
+          replies: [{ message: '🟢 *Missão Iniciada!* O bot está capturando as comprovações.' }]
         });
       }
 
-      const listaArray = Array.from(participantes).map((item) => {
-        // Tenta achar o último emoji da linha para usar como peso de ordenação
-        const matchRank = item.match(/([✴️🈸🉑🔆⚜️🔱✨]+)$/u);
-        const rankEmoji = matchRank ? matchRank[1].slice(-2) : '✴️';
-
-        return {
-          textoCompleto: item,
-          peso: PESO_RANKS[rankEmoji] || 1,
-          nickLimpo: item.replace(/^[^\p{L}\p{N}]+/u, '').trim()
-        };
-      });
-
-      listaArray.sort((a, b) => {
-        if (b.peso !== a.peso) return b.peso - a.peso;
-        return a.nickLimpo.localeCompare(b.nickLimpo, 'pt-BR', { sensitivity: 'base' });
-      });
-
-      const textoFinal = listaArray.map((item) => `• ${item.textoCompleto}`).join('\n');
-      const resposta = `📋 *CAÇADORES NA MISSÃO (${participantes.size}):*\n\n${textoFinal}`;
-
-      if (comando === '/fecharmissao') {
+      if (comando === '/limpar') {
         missaoAberta = false;
+        participantes = [];
         return res.status(200).json({
-          replies: [{ message: '🔴 *Missão Encerrada!* Lista final:\n\n' + resposta }]
+          replies: [{ message: '🧹 Lista zerada e missão fechada!' }]
         });
       }
 
-      return res.status(200).json({ replies: [{ message: resposta }] });
+      if (comando === '/fecharmissao' || comando === '!lista') {
+        if (participantes.length === 0) {
+          return res.status(200).json({
+            replies: [{ message: '📭 Nenhum caçador registrado nesta missão.' }]
+          });
+        }
+
+        // Remove duplicados mantendo a ordem
+        const unicos = [...new Set(participantes)];
+
+        // Ordenação por peso de rank
+        unicos.sort((a, b) => {
+          const matchA = a.match(/([✴️🈸🉑🔆⚜️🔱✨]+)$/u);
+          const matchB = b.match(/([✴️🈸🉑🔆⚜️🔱✨]+)$/u);
+          const pesoA = matchA && PESO_RANKS[matchA[1].slice(-2)] ? PESO_RANKS[matchA[1].slice(-2)] : 1;
+          const pesoB = matchB && PESO_RANKS[matchB[1].slice(-2)] ? PESO_RANKS[matchB[1].slice(-2)] : 1;
+          return pesoB - pesoA;
+        });
+
+        const textoFinal = unicos.map((item) => `• ${item}`).join('\n');
+        const resposta = `📋 *CAÇADORES NA MISSÃO (${unicos.length}):*\n\n${textoFinal}`;
+
+        if (comando === '/fecharmissao') {
+          missaoAberta = false;
+          return res.status(200).json({
+            replies: [{ message: '🔴 *Missão Encerrada!* Lista final:\n\n' + resposta }]
+          });
+        }
+
+        return res.status(200).json({
+          replies: [{ message: resposta }]
+        });
+      }
     }
 
-    if (comando === '/limpar') {
-      participantes.clear();
-      missaoAberta = false;
-      return res.status(200).json({
-        replies: [{ message: '🧹 Lista zerada e missão fechada!' }]
-      });
-    }
-
+    // Se a missão estiver fechada, ignora mensagens comuns
     if (!missaoAberta) {
       return res.status(200).json({ replies: [] });
     }
 
-    // Valida mensagens que começam com texto/emoji e terminam com emojis (o padrão do print)
+    // Captura mensagens que terminam com emojis (como o modelo do print)
     const primeiraLinha = message.split('\n')[0].trim();
-    // Regex flexível: aceita qualquer texto que tenha emojis no início e/ou fim
-    const regexValida = /^(.+?)[✴️🈸🉑🔆⚜️🔱✨]+$/u;
+    const temEmojisNoFim = /[✴️🈸🉑🔆⚜️🔱✨]+$/u.test(primeiraLinha);
 
-    let nickValido = null;
-    if (regexValida.test(primeiraLinha)) {
-      nickValido = primeiraLinha;
-    } else if (regexValida.test(message)) {
-      nickValido = message;
-    }
-
-    if (nickValido) {
-      if (!participantes.has(nickValido)) {
-        participantes.add(nickValido);
+    if (temEmojisNoFim) {
+      if (!participantes.includes(primeiraLinha)) {
+        participantes.push(primeiraLinha);
         return res.status(200).json({
           replies: [{ reaction: "✅" }]
         });
@@ -122,8 +119,139 @@ module.exports = async (req, res) => {
 
     return res.status(200).json({ replies: [] });
 
-  } catch (error) {
-    console.error('Erro:', error);
+  } catch (err) {
+    // Retorna status 200 com aviso para o AutoResponder nunca travar com erro 500
+    console.error('Erro capturado:', err);
+    return res.status(200).json({
+      replies: [{ message: '⚠️ Erro interno processado com segurança.' }]
+    });
+  }
+};// Controle de estado global da missão
+let missaoAberta = false;
+let participantes = [];
+const SENHA_ADM = 'kaeldecalcinha';
+
+const PESO_RANKS = {
+  '✴️': 1,
+  '🈸': 2,
+  '🉑': 3,
+  '🔆': 4,
+  '⚜️': 5,
+  '🔱': 6,
+  '✨': 6
+};
+
+module.exports = async (req, res) => {
+  // Garante resposta em JSON mesmo se houver erro bruto
+  try {
+    if (req.method !== 'POST') {
+      return res.status(200).json({ status: 'ok', message: 'API ativa.' });
+    }
+
+    const body = req.body || {};
+    const query = body.query || {};
+    const message = (query.message || query.text || '').trim();
+
+    if (!message) {
+      return res.status(200).json({ replies: [] });
+    }
+
+    const partes = message.split(/\s+/);
+    const comando = partes[0] ? partes[0].toLowerCase() : '';
+    const senhaInformada = partes[1] || '';
+
+    const ehComando =
+      comando === '/iniciarmissao' ||
+      comando === '/fecharmissao' ||
+      comando === '!lista' ||
+      comando === '/limpar';
+
+    // Validação de senha para comandos de ADM
+    if (ehComando) {
+      if (senhaInformada !== SENHA_ADM) {
+        return res.status(200).json({
+          replies: [
+            { message: `⚠️ Senha incorreta para o comando ${comando}. Use: ${comando} ${SENHA_ADM}` }
+          ]
+        });
+      }
+
+      if (comando === '/iniciarmissao') {
+        missaoAberta = true;
+        participantes = [];
+        return res.status(200).json({
+          replies: [{ message: '🟢 *Missão Iniciada!* O bot está capturando as comprovações.' }]
+        });
+      }
+
+      if (comando === '/limpar') {
+        missaoAberta = false;
+        participantes = [];
+        return res.status(200).json({
+          replies: [{ message: '🧹 Lista zerada e missão fechada!' }]
+        });
+      }
+
+      if (comando === '/fecharmissao' || comando === '!lista') {
+        if (participantes.length === 0) {
+          return res.status(200).json({
+            replies: [{ message: '📭 Nenhum caçador registrado nesta missão.' }]
+          });
+        }
+
+        // Remove duplicados mantendo a ordem
+        const unicos = [...new Set(participantes)];
+
+        // Ordenação por peso de rank
+        unicos.sort((a, b) => {
+          const matchA = a.match(/([✴️🈸🉑🔆⚜️🔱✨]+)$/u);
+          const matchB = b.match(/([✴️🈸🉑🔆⚜️🔱✨]+)$/u);
+          const pesoA = matchA && PESO_RANKS[matchA[1].slice(-2)] ? PESO_RANKS[matchA[1].slice(-2)] : 1;
+          const pesoB = matchB && PESO_RANKS[matchB[1].slice(-2)] ? PESO_RANKS[matchB[1].slice(-2)] : 1;
+          return pesoB - pesoA;
+        });
+
+        const textoFinal = unicos.map((item) => `• ${item}`).join('\n');
+        const resposta = `📋 *CAÇADORES NA MISSÃO (${unicos.length}):*\n\n${textoFinal}`;
+
+        if (comando === '/fecharmissao') {
+          missaoAberta = false;
+          return res.status(200).json({
+            replies: [{ message: '🔴 *Missão Encerrada!* Lista final:\n\n' + resposta }]
+          });
+        }
+
+        return res.status(200).json({
+          replies: [{ message: resposta }]
+        });
+      }
+    }
+
+    // Se a missão estiver fechada, ignora mensagens comuns
+    if (!missaoAberta) {
+      return res.status(200).json({ replies: [] });
+    }
+
+    // Captura mensagens que terminam com emojis (como o modelo do print)
+    const primeiraLinha = message.split('\n')[0].trim();
+    const temEmojisNoFim = /[✴️🈸🉑🔆⚜️🔱✨]+$/u.test(primeiraLinha);
+
+    if (temEmojisNoFim) {
+      if (!participantes.includes(primeiraLinha)) {
+        participantes.push(primeiraLinha);
+        return res.status(200).json({
+          replies: [{ reaction: "✅" }]
+        });
+      }
+    }
+
     return res.status(200).json({ replies: [] });
+
+  } catch (err) {
+    // Retorna status 200 com aviso para o AutoResponder nunca travar com erro 500
+    console.error('Erro capturado:', err);
+    return res.status(200).json({
+      replies: [{ message: '⚠️ Erro interno processado com segurança.' }]
+    });
   }
 };
